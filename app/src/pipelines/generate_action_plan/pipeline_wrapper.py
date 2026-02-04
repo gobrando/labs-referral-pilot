@@ -59,7 +59,11 @@ class PipelineWrapper(BasePipelineWrapper):
 
     # Called for the `generate-action-plan/run` endpoint
     def run_api(
-        self, resources: list[Resource] | list[dict], user_email: str, user_query: str
+        self,
+        resources: list[Resource] | list[dict],
+        user_email: str,
+        user_query: str,
+        temperature: float | None = None,
     ) -> dict:
         resource_objects = get_resources(resources)
 
@@ -69,13 +73,19 @@ class PipelineWrapper(BasePipelineWrapper):
             with tracer.start_as_current_span(  # pylint: disable=not-context-manager,unexpected-keyword-arg
                 self.name, openinference_span_kind="chain"
             ) as span:
-                result = self._run(resource_objects, user_email, user_query)
+                result = self._run(resource_objects, user_email, user_query, temperature)
                 span.set_input([r.name for r in resource_objects])
                 span.set_output(result["response"])
                 span.set_status(Status(StatusCode.OK))
                 return result
 
-    def _run(self, resource_objects: list[Resource], user_email: str, user_query: str) -> dict:
+    def _run(
+        self,
+        resource_objects: list[Resource],
+        user_email: str,
+        user_query: str,
+        temperature: float | None = None,
+    ) -> dict:
         response = self.pipeline.run(
             {
                 "logger": {
@@ -88,7 +98,11 @@ class PipelineWrapper(BasePipelineWrapper):
                     "action_plan_json": action_plan_as_json,
                     "user_query": user_query,
                 },
-                "llm": {"model": "gpt-5-mini", "reasoning_effort": "low"},
+                "llm": {
+                    "model": "gpt-5-mini",
+                    "reasoning_effort": "low",
+                    "temperature": temperature,
+                },
             },
             include_outputs_from={"llm"},
         )

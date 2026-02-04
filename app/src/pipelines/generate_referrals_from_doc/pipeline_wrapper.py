@@ -65,7 +65,12 @@ class PipelineWrapper(BasePipelineWrapper):
     # Must use the `files` parameter name for file uploads to work
     # See https://github.com/deepset-ai/hayhooks/blob/2070f51db4c0d2bb45131b87d736304996e09058/docs/concepts/pipeline-wrapper.md#file-upload-support
     # and https://github.com/deepset-ai/hayhooks/blob/2070f51db4c0d2bb45131b87d736304996e09058/src/hayhooks/server/utils/deploy_utils.py#L287
-    def run_api(self, user_email: str, files: Optional[List[UploadFile]] = None) -> dict:
+    def run_api(
+        self,
+        user_email: str,
+        files: Optional[List[UploadFile]] = None,
+        temperature: float | None = None,
+    ) -> dict:
         if not files:
             raise HTTPException(status_code=400, detail="No files provided for processing.")
 
@@ -75,7 +80,7 @@ class PipelineWrapper(BasePipelineWrapper):
             with tracer.start_as_current_span(  # pylint: disable=not-context-manager,unexpected-keyword-arg
                 self.name, openinference_span_kind="chain"
             ) as span:
-                result = self._run(files)
+                result = self._run(files, temperature)
                 span.set_input([file.filename for file in files])
                 try:
                     resp_obj = json.loads(result["llm"]["replies"][-1].text)
@@ -85,7 +90,7 @@ class PipelineWrapper(BasePipelineWrapper):
                 span.set_status(Status(StatusCode.OK))
                 return result
 
-    def _run(self, files: List[UploadFile]) -> dict:
+    def _run(self, files: List[UploadFile], temperature: float | None = None) -> dict:
         response = self.pipeline.run(
             {
                 "logger": {
@@ -95,7 +100,11 @@ class PipelineWrapper(BasePipelineWrapper):
                 "prompt_builder": {
                     "response_json": response_schema,
                 },
-                "llm": {"model": "gpt-5-mini", "reasoning_effort": "low"},
+                "llm": {
+                    "model": "gpt-5-mini",
+                    "reasoning_effort": "low",
+                    "temperature": temperature,
+                },
             },
             include_outputs_from={"llm"},
         )

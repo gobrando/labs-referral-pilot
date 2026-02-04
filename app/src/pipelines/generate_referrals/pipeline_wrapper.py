@@ -98,14 +98,20 @@ class PipelineWrapper(BasePipelineWrapper):
         self.pipeline = pipeline
 
     # Called for the `generate-referrals/run` endpoint
-    def run_api(self, query: str, user_email: str, prompt_version_id: str = "") -> dict:
+    def run_api(
+        self,
+        query: str,
+        user_email: str,
+        prompt_version_id: str = "",
+        temperature: float | None = None,
+    ) -> dict:
         with using_attributes(user_id=user_email), using_metadata({"user_id": user_email}):
             # Must set using_metadata context before calling tracer.start_as_current_span()
             assert isinstance(tracer, _tracers.OITracer), f"Got unexpected {type(tracer)}"
             with tracer.start_as_current_span(  # pylint: disable=not-context-manager,unexpected-keyword-arg
                 self.name, openinference_span_kind="chain"
             ) as span:
-                result = self._run(query, user_email, prompt_version_id)
+                result = self._run(query, user_email, prompt_version_id, temperature)
                 span.set_input(query)
                 try:
                     resp_obj = json.loads(result["llm"]["replies"][-1].text)
@@ -115,7 +121,13 @@ class PipelineWrapper(BasePipelineWrapper):
                 span.set_status(Status(StatusCode.OK))
                 return result
 
-    def _run(self, query: str, user_email: str, prompt_version_id: str = "") -> dict:
+    def _run(
+        self,
+        query: str,
+        user_email: str,
+        prompt_version_id: str = "",
+        temperature: float | None = None,
+    ) -> dict:
         # Retrieve the requested prompt_version_id and error if requested prompt version is not found
         try:
             prompt_template = haystack_utils.get_phoenix_prompt(
@@ -138,7 +150,11 @@ class PipelineWrapper(BasePipelineWrapper):
                         "query": query,
                         "response_json": response_schema,
                     },
-                    "llm": {"model": "gpt-5-mini", "reasoning_effort": "low"},
+                    "llm": {
+                        "model": "gpt-5-mini",
+                        "reasoning_effort": "low",
+                        "temperature": temperature,
+                    },
                 },
                 include_outputs_from={"llm", "save_result"},
             )
