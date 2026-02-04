@@ -158,6 +158,7 @@ class OpenAIWebSearchGenerator:
         domain: str | None = None,
         model: str = "gpt-5",
         reasoning_effort: str = "high",
+        temperature: float | None = None,
     ) -> dict:
         """
         Run the OpenAI web search generator.
@@ -171,10 +172,11 @@ class OpenAIWebSearchGenerator:
         """
 
         logger.info(
-            "Calling OpenAI API with web_search, model=%s, domain=%s, reasoning_effort=%s",
+            "Calling OpenAI API with web_search, model=%s, domain=%s, reasoning_effort=%s, temperature=%s",
             model,
             domain,
             reasoning_effort,
+            temperature,
         )
 
         assert len(messages) == 1
@@ -187,6 +189,9 @@ class OpenAIWebSearchGenerator:
             "reasoning": {"effort": reasoning_effort},
             "tools": [{"type": "web_search"}],
         }
+
+        if temperature is not None:
+            api_params["temperature"] = temperature
 
         if domain:
             api_params["tools"][0]["filters"] = {"allowed_domains": [domain]}
